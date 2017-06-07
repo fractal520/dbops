@@ -382,3 +382,20 @@ class Comment(db.Model):
 
 
 db.event.listen(Comment.body, 'set', Comment.on_changed_body)
+
+
+class Dbinfo(db.Model):
+    __tablename__='dbinfos'
+    id = db.Column(db.Integer, primary_key=True)
+    name=db.Column(db.Text)
+    ip=db.Column(db.Integer)
+    port=db.Column(db.Integer)
+    dbname=db.Column(db.Text)
+    monilogs=db.relationship('Monilog',backref='db',lazy='dynamic')
+
+class Monilog(db.Model):
+    __tablename__ = 'monilogs'
+    id = db.Column(db.Integer, primary_key=True)
+    monitor_log = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    db_id = db.Column(db.Integer, db.ForeignKey('dbinfos.id'))
