@@ -7,8 +7,8 @@ import bleach
 from flask import current_app, request, url_for
 from flask_login import UserMixin, AnonymousUserMixin
 from app.exceptions import ValidationError
+from sqlalchemy.dialects.mysql.base import INTEGER
 from . import db, login_manager
-
 
 class Permission:
     FOLLOW = 0x01
@@ -385,17 +385,31 @@ db.event.listen(Comment.body, 'set', Comment.on_changed_body)
 
 
 class Dbinfo(db.Model):
-    __tablename__='dbinfos'
-    id = db.Column(db.Integer, primary_key=True)
-    name=db.Column(db.Text)
-    ip=db.Column(db.Integer)
-    port=db.Column(db.Integer)
-    dbname=db.Column(db.Text)
-    monilogs=db.relationship('Monilog',backref='db',lazy='dynamic')
+    __tablename__= 'dbinfos'
+    db_id = db.Column(db.Integer, primary_key=True)
+    instance_name = db.Column(db.String(100))
+    dbname = db.Column(db.String(100))
+    ip = db.Column(INTEGER(display_width=11,unsigned = True))
+    port = db.Column(db.Integer)
+    schema_name = db.Column(db.String(100))
+    db_type = db.Column(db.String(20))
+    monitor_logs = db.relationship('Monitor_log',backref='dbinfo',lazy='dynamic')
 
-class Monilog(db.Model):
-    __tablename__ = 'monilogs'
+class Monitor_level(db.Model):
+    __tablename__ = 'monitor_levels'
+    level_id = db.Column(db.Integer, primary_key=True)
+    level_name = db.Column(db.String(20))
+    level_desc = db.Column(db.Text)
+
+class Monitor_log(db.Model):
+    __tablename__ = 'monitor_logs'
     id = db.Column(db.Integer, primary_key=True)
+    db_id = db.Column(db.Integer, db.ForeignKey('dbinfos.db_id'))
     monitor_log = db.Column(db.Text)
-    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
-    db_id = db.Column(db.Integer, db.ForeignKey('dbinfos.id'))
+    monitor_level_name = db.Column(db.String(20))
+    level_id = db.Column(db.Integer, db.ForeignKey('monitor_levels.level_id'))
+    create_time = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    status = db.Column(db.SmallInteger)
+    finish_time = db.Column(db.DateTime)
+
+

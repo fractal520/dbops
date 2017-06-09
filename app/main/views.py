@@ -15,7 +15,7 @@ def after_request(response):
     for query in get_debug_queries():
         if query.duration >= current_app.config['FLASKY_SLOW_DB_QUERY_TIME']:
             current_app.logger.warning(
-                'Slow query: %s\nParameters: %s\nDuration: %fs\nContext: %s\n'
+                'Slow query: %s^rParameters: %s^rDuration: %fs^rContext: %s^r'
                 % (query.statement, query.parameters, query.duration,
                    query.context))
     return response
