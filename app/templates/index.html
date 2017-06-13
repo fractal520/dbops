@@ -9,7 +9,7 @@
     <h1>Hello, {% if current_user.is_authenticated %}{{ current_user.username }}{% else %}Stranger{% endif %}!</h1>
 </div>
 <div>
-    {% if current_user.can(Permission.WRITE_ARTICLES) %}
+    {% if current_user.can(Permission.EDIT_DBINFO) %}
     {{ wtf.quick_form(form) }}
     {% endif %}
 </div>
@@ -20,7 +20,7 @@
         <li{% if show_followed %} class="active"{% endif %}><a href="{{ url_for('.show_followed') }}">Followers</a></li>
         {% endif %}
     </ul>
-    {% include '_posts.html' %}
+    {% include '_monitor_logs.html' %}
 </div>
 {% if pagination %}
 <div class="pagination">

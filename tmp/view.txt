@@ -1,0 +1,6 @@
+form.dbname.data = dbinfo.dbname
+form.true_ip.data = dbinfo.true_ip
+form.port.data = dbinfo.port
+form.instance_name.data = dbinfo.instance
+form.schema_name.data = dbinfo.schema_name
+form.db_type.data = dbinfo.db_type

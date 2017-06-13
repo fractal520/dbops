@@ -1,10 +1,9 @@
 from flask_wtf import Form
-from wtforms import StringField, TextAreaField, BooleanField, SelectField,\
-    SubmitField
+from wtforms import StringField, IntegerField, TextAreaField, BooleanField, SelectField, SubmitField
 from wtforms.validators import Required, Length, Email, Regexp
 from wtforms import ValidationError
 from flask_pagedown.fields import PageDownField
-from ..models import Role, User
+from ..models import Role, User, Dbinfo, Dbtype
 
 
 class NameForm(Form):
@@ -48,6 +47,21 @@ class EditProfileAdminForm(Form):
         if field.data != self.user.username and \
                 User.query.filter_by(username=field.data).first():
             raise ValidationError('Username already in use.')
+
+class EditDbinfoForm(Form):
+    dbname = StringField('database name', validators=[Required(),Length(0, 64)])
+    true_ip = StringField('ip address', validators=[Length(0, 64)])
+    port = IntegerField('port number')
+    instance_name = StringField('instance name', validators=[Length(0, 64)])
+    schema_name = StringField('schema name', validators=[Length(0, 64)])
+    db_type = SelectField('dbtype', coerce=int)
+    submit = SubmitField('Submit')
+
+    def __init__(self, dbinfo, *args, **kwargs):
+        super(EditDbinfoForm, self).__init__(*args, **kwargs)
+        self.db_type.choices = [(dbtype.db_type_id, dbtype.db_type_name)
+                             for dbtype in Dbtype.query.order_by(Dbtype.db_type_name).all()]
+        self.dbinfo = dbinfo
 
 
 class PostForm(Form):

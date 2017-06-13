@@ -4,9 +4,9 @@ from flask_login import login_required, current_user
 from flask_sqlalchemy import get_debug_queries
 from . import main
 from .forms import EditProfileForm, EditProfileAdminForm, PostForm,\
-    CommentForm
+    CommentForm, EditDbinfoForm
 from .. import db
-from ..models import Permission, Role, User, Post, Comment
+from ..models import Permission, Role, User, Post, Comment, Monitor_log, Dbinfo,Dbtype
 from ..decorators import admin_required, permission_required
 
 
@@ -35,7 +35,7 @@ def server_shutdown():
 @main.route('/', methods=['GET', 'POST'])
 def index():
     form = PostForm()
-    if current_user.can(Permission.WRITE_ARTICLES) and \
+    if current_user.can(Permission.EDIT_DBINFO) and \
             form.validate_on_submit():
         post = Post(body=form.body.data,
                     author=current_user._get_current_object())
@@ -46,16 +46,39 @@ def index():
     if current_user.is_authenticated:
         show_followed = bool(request.cookies.get('show_followed', ''))
     if show_followed:
-        query = current_user.followed_posts
+        query = current_user.followed_monitor_logs
     else:
-        query = Post.query
-    pagination = query.order_by(Post.timestamp.desc()).paginate(
+        query = Monitor_log.query
+    pagination = query.order_by(Monitor_log.create_time.desc()).paginate(
         page, per_page=current_app.config['FLASKY_POSTS_PER_PAGE'],
         error_out=False)
-    posts = pagination.items
-    return render_template('index.html', form=form, posts=posts,
+    monitor_logs = pagination.items
+    return render_template('index.html', form=form, monitor_logs=monitor_logs,
                            show_followed=show_followed, pagination=pagination)
 
+@main.route('/monitor', methods=['GET', 'POST'])
+def monitor():
+    form = PostForm()
+    if current_user.can(Permission.EDIT_DBINFO) and \
+            form.validate_on_submit():
+        post = Post(body=form.body.data,
+                    author=current_user._get_current_object())
+        db.session.add(post)
+        return redirect(url_for('.index'))
+    page = request.args.get('page', 1, type=int)
+    show_followed = False
+    if current_user.is_authenticated:
+        show_followed = bool(request.cookies.get('show_followed', ''))
+    if show_followed:
+        query = current_user.followed_monitor_logs
+    else:
+        query = Monitor_log.query
+    pagination = query.order_by(Monitor_log.create_time.desc()).paginate(
+        page, per_page=current_app.config['FLASKY_POSTS_PER_PAGE'],
+        error_out=False)
+    monitor_logs = pagination.items
+    return render_template('index.html', form=form, monitor_logs=monitor_logs,
+                           show_followed=show_followed, pagination=pagination)
 
 @main.route('/user/<username>')
 def user(username):
@@ -68,6 +91,30 @@ def user(username):
     return render_template('user.html', user=user, posts=posts,
                            pagination=pagination)
 
+@main.route('/dbinfo/')
+def dbsinfo():
+    dbinfos = Dbinfo.query.order_by(Dbinfo.add_time.desc()).all()
+    return render_template('dbinfo.html', dbinfos=dbinfos)
+
+@main.route('/dbinfo/<instance_name>')
+def dbinfo(instance_name):
+    dbinfo = Dbinfo.query.filter_by(instacne_name=instance_name).first_or_404()
+    return render_template('dbinfo.html', dbinfos=[dbinfo])
+
+@main.route('/edit_monitor/<id>')
+def edit_monitor(instance_name):
+    dbinfo = Dbinfo.query.filter_by(instance_name=instance_name).first_or_404()
+    return render_template('dbinfo.html', dbinfo=dbinfo)
+
+@main.route('/dbsummary/<dbname>')
+def dbsummary(dbname):
+    dbinfo = Dbinfo.query.filter_by(dbname=dbname).first_or_404()
+    page = request.args.get('page', 1, type=int)
+    pagination = dbinfo.monitor_logs.order_by(Monitor_log.create_time.desc()).paginate(
+        page, per_page=current_app.config['FLASKY_POSTS_PER_PAGE'],
+        error_out=False)
+    monitor_logs = pagination.items
+    return render_template('dbsummary.html',dbinfos=[dbinfo],monitor_logs=monitor_logs,pagination=pagination)
 
 @main.route('/edit-profile', methods=['GET', 'POST'])
 @login_required
@@ -113,6 +160,50 @@ def edit_profile_admin(id):
     return render_template('edit_profile.html', form=form, user=user)
 
 
+@main.route('/add-db',methods=['GET', 'POST'])
+@login_required
+def add_dbinfo():
+    dbinfo = Dbinfo()
+    form = EditDbinfoForm(dbinfo)
+    if form.validate_on_submit():
+        dbinfo = Dbinfo(dbname = form.dbname.data,
+                        true_ip = form.true_ip.data,
+                        port = form.port.data,
+                        instance_name = form.instance_name.data,
+                        schema_name = form.schema_name.data,
+                        dbtype = Dbtype.query.get(form.db_type.data)
+                        )
+        db.session.add(dbinfo)
+        db.session.commit
+        flash('A new db  has been added.')
+        return redirect(url_for('.dbsinfo'))
+    return render_template('edit_dbinfo.html',form=form,dbinfo=dbinfo)
+
+
+@main.route('/edit-dbinfo/<int:db_id>', methods=['GET', 'POST'])
+@login_required
+def edit_dbinfo(db_id):
+    dbinfo = Dbinfo.query.get_or_404(db_id)
+    form = EditDbinfoForm(dbinfo=dbinfo)
+    if form.validate_on_submit():
+        dbinfo.dbname = form.dbname.data
+        dbinfo.true_ip = form.true_ip.data
+        dbinfo.port = form.port.data
+        dbinfo.instance_name = form.instance_name.data
+        dbinfo.schema_name = form.schema_name.data
+        dbinfo.dbtype = Dbtype.query.get(form.db_type.data)
+        db.session.add(dbinfo)
+        flash('The dbinfo has been updated.')
+        return redirect(url_for('.dbsinfo'))
+    form.dbname.data = dbinfo.dbname
+    form.true_ip.data = dbinfo.true_ip[0]
+    form.port.data = dbinfo.port
+    form.instance_name.data = dbinfo.instance_name
+    form.schema_name.data = dbinfo.schema_name
+    form.db_type.data = dbinfo.dbtype.db_type_id
+    return render_template('edit_dbinfo.html', form=form, dbinfo=dbinfo)
+
+
 @main.route('/post/<int:id>', methods=['GET', 'POST'])
 def post(id):
     post = Post.query.get_or_404(id)
@@ -153,36 +244,36 @@ def edit(id):
     return render_template('edit_post.html', form=form)
 
 
-@main.route('/follow/<username>')
+@main.route('/follow/<dbname>')
 @login_required
 @permission_required(Permission.FOLLOW)
-def follow(username):
-    user = User.query.filter_by(username=username).first()
-    if user is None:
-        flash('Invalid user.')
+def follow(dbname):
+    dbinfo = Dbinfo.query.filter_by(dbname=dbname).first()
+    if dbinfo is None:
+        flash('Invalid db.')
         return redirect(url_for('.index'))
-    if current_user.is_following(user):
-        flash('You are already following this user.')
-        return redirect(url_for('.user', username=username))
-    current_user.follow(user)
+    if current_user.is_following(dbinfo):
+        flash('You are already following this db.')
+        return redirect(url_for('.dbsummary', dbname=dbname))
+    current_user.follow(dbinfo)
     flash('You are now following %s.' % username)
-    return redirect(url_for('.user', username=username))
+    return redirect(url_for('.dbsummary', dbname=dbname))
 
 
-@main.route('/unfollow/<username>')
+@main.route('/unfollow/<dbname>')
 @login_required
 @permission_required(Permission.FOLLOW)
-def unfollow(username):
-    user = User.query.filter_by(username=username).first()
-    if user is None:
-        flash('Invalid user.')
+def unfollow(dbname):
+    dbinfo = Dbinfo.query.filter_by(dbname=dbname).first()
+    if dbinfo is None:
+        flash('Invalid db.')
         return redirect(url_for('.index'))
-    if not current_user.is_following(user):
+    if not current_user.is_following(dbinfo):
         flash('You are not following this user.')
-        return redirect(url_for('.user', username=username))
-    current_user.unfollow(user)
-    flash('You are not following %s anymore.' % username)
-    return redirect(url_for('.user', username=username))
+        return redirect(url_for('.dbsummary', dbname=dbname))
+    current_user.unfollow(dbinfo)
+    flash('You are not following %s anymore.' % dbname)
+    return redirect(url_for('.dbsummary', dbname=dbname))
 
 
 @main.route('/followers/<username>')
@@ -237,7 +328,7 @@ def show_followed():
 
 @main.route('/moderate')
 @login_required
-@permission_required(Permission.MODERATE_COMMENTS)
+@permission_required(Permission.ASSIGNED_DB)
 def moderate():
     page = request.args.get('page', 1, type=int)
     pagination = Comment.query.order_by(Comment.timestamp.desc()).paginate(
@@ -250,7 +341,7 @@ def moderate():
 
 @main.route('/moderate/enable/<int:id>')
 @login_required
-@permission_required(Permission.MODERATE_COMMENTS)
+@permission_required(Permission.ASSIGNED_DB)
 def moderate_enable(id):
     comment = Comment.query.get_or_404(id)
     comment.disabled = False
@@ -261,7 +352,7 @@ def moderate_enable(id):
 
 @main.route('/moderate/disable/<int:id>')
 @login_required
-@permission_required(Permission.MODERATE_COMMENTS)
+@permission_required(Permission.ASSIGNED_DB)
 def moderate_disable(id):
     comment = Comment.query.get_or_404(id)
     comment.disabled = True

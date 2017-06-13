@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+
+{% block title %}Dbops - {{ dbinfos[0].dbname }}{% endblock %}
+
+{% block page_content %}
+<div class="page-header">
+    <div class="profile-header">
+        <h1>{{ dbinfos[0].dbname }}</h1>
+        <!--{% if dbinfos[0].about_me %}<p>{{ dbinfos[0].about_me }}</p>{% endif %}-->
+        <p>{{ dbinfos[0].monitor_logs.count() }} monitor logs. </p>
+        <p>
+            {% if current_user.can(Permission.FOLLOW) and user != current_user %}
+                {% if not current_user.is_following(dbinfo) %}
+                <a href="{{ url_for('.follow', dbname=dbinfo.dbname) }}" class="btn btn-primary">Follow</a>
+                {% else %}
+                <a href="{{ url_for('.unfollow', dbname=dbinfo.dbname) }}" class="btn btn-default">Unfollow</a>
+                {% endif %}
+            {% endif %}
+        </p>
+    </div>
+</div>
+<h3>{{ dbinfos[0].dbname }}的数据库信息</h3>
+{% include '_dbinfo.html' %}
+<h3> {{ dbinfos[0].dbname }}的监控报警 </h3>
+{% include '_monitor_logs.html' %}
+{% if pagination %}
+<div class="pagination">
+    {{ macros.pagination_widget(pagination, '.dbsummary', dbname=dbinfos[0].dbname) }}
+</div>
+{% endif %}
+{% endblock %}

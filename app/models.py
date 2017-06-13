@@ -11,10 +11,19 @@ from sqlalchemy.dialects.mysql.base import INTEGER
 from . import db, login_manager
 
 class Permission:
+    '''
     FOLLOW = 0x01
     COMMENT = 0x02
     WRITE_ARTICLES = 0x04
     MODERATE_COMMENTS = 0x08
+
+    ADMINISTER = 0x80
+    '''
+    FOLLOW = 0x01
+    DEAL_MONITOR = 0x02
+    EDIT_DBINFO = 0x04
+    DIAGNOSE = 0x08
+    ASSIGNED_DB = 0x10
     ADMINISTER = 0x80
 
 
@@ -30,12 +39,14 @@ class Role(db.Model):
     def insert_roles():
         roles = {
             'User': (Permission.FOLLOW |
-                     Permission.COMMENT |
-                     Permission.WRITE_ARTICLES, True),
+                     Permission.DEAL_MONITOR |
+                     Permission.EDIT_DBINFO |
+                     Permission.DIAGNOSE, True),
             'Moderator': (Permission.FOLLOW |
-                          Permission.COMMENT |
-                          Permission.WRITE_ARTICLES |
-                          Permission.MODERATE_COMMENTS, False),
+                          Permission.DEAL_MONITOR |
+                          Permission.EDIT_DBINFO |
+                          Permission.DIAGNOSE |
+                          Permission.ASSIGNED_DB, False),
             'Administrator': (0xff, False)
         }
         for r in roles:
@@ -55,10 +66,9 @@ class Follow(db.Model):
     __tablename__ = 'follows'
     follower_id = db.Column(db.Integer, db.ForeignKey('users.id'),
                             primary_key=True)
-    followed_id = db.Column(db.Integer, db.ForeignKey('users.id'),
+    db_id = db.Column(db.Integer, db.ForeignKey('dbinfos.db_id'),
                             primary_key=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -74,18 +84,16 @@ class User(UserMixin, db.Model):
     member_since = db.Column(db.DateTime(), default=datetime.utcnow)
     last_seen = db.Column(db.DateTime(), default=datetime.utcnow)
     avatar_hash = db.Column(db.String(32))
-    posts = db.relationship('Post', backref='author', lazy='dynamic')
-    followed = db.relationship('Follow',
+    #posts = db.relationship('Post', backref='author', lazy='dynamic')
+    followed_db = db.relationship('Follow',
                                foreign_keys=[Follow.follower_id],
-                               backref=db.backref('follower', lazy='joined'),
+                               backref=db.backref('follower_user', lazy='joined'),
                                lazy='dynamic',
                                cascade='all, delete-orphan')
-    followers = db.relationship('Follow',
-                                foreign_keys=[Follow.followed_id],
-                                backref=db.backref('followed', lazy='joined'),
-                                lazy='dynamic',
-                                cascade='all, delete-orphan')
-    comments = db.relationship('Comment', backref='author', lazy='dynamic')
+    '''
+
+    '''
+    #comments = db.relationship('Comment', backref='author', lazy='dynamic')
 
     @staticmethod
     def generate_fake(count=100):
@@ -108,7 +116,7 @@ class User(UserMixin, db.Model):
                 db.session.commit()
             except IntegrityError:
                 db.session.rollback()
-
+    '''
     @staticmethod
     def add_self_follows():
         for user in User.query.all():
@@ -116,7 +124,7 @@ class User(UserMixin, db.Model):
                 user.follow(user)
                 db.session.add(user)
                 db.session.commit()
-
+    '''
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
         if self.role is None:
@@ -127,7 +135,7 @@ class User(UserMixin, db.Model):
         if self.email is not None and self.avatar_hash is None:
             self.avatar_hash = hashlib.md5(
                 self.email.encode('utf-8')).hexdigest()
-        self.followed.append(Follow(followed=self))
+        #self.followed.append(Follow(followed=self))
 
     @property
     def password(self):
@@ -216,28 +224,25 @@ class User(UserMixin, db.Model):
         return '{url}/{hash}?s={size}&d={default}&r={rating}'.format(
             url=url, hash=hash, size=size, default=default, rating=rating)
 
-    def follow(self, user):
-        if not self.is_following(user):
-            f = Follow(follower=self, followed=user)
+    def follow(self, dbinfo):
+        if not self.is_following(dbinfo):
+            f = Follow(follower_user=self, followed_db=dbinfo)
             db.session.add(f)
 
-    def unfollow(self, user):
-        f = self.followed.filter_by(followed_id=user.id).first()
+    def unfollow(self, dbinfo):
+        f = self.followed_db.filter_by(db_id=dbinfo.db_id).first()
         if f:
             db.session.delete(f)
 
-    def is_following(self, user):
-        return self.followed.filter_by(
-            followed_id=user.id).first() is not None
+    def is_following(self, dbinfo):
+        return self.followed_db.filter_by(
+            db_id=dbinfo.db_id).first() is not None
+    '''
 
-    def is_followed_by(self, user):
-        return self.followers.filter_by(
-            follower_id=user.id).first() is not None
-
+    '''
     @property
-    def followed_posts(self):
-        return Post.query.join(Follow, Follow.followed_id == Post.author_id)\
-            .filter(Follow.follower_id == self.id)
+    def followed_monitor_logs(self):
+        return Monitor_log.query.join(Follow, Follow.db_id == Monitor_log.db_id).filter(Follow.follower_id == self.id)
 
     def to_json(self):
         json_user = {
@@ -385,15 +390,41 @@ db.event.listen(Comment.body, 'set', Comment.on_changed_body)
 
 
 class Dbinfo(db.Model):
-    __tablename__= 'dbinfos'
+    __tablename__ = 'dbinfos'
     db_id = db.Column(db.Integer, primary_key=True)
-    instance_name = db.Column(db.String(100))
     dbname = db.Column(db.String(100))
     ip = db.Column(INTEGER(display_width=11,unsigned = True))
     port = db.Column(db.Integer)
+    instance_name = db.Column(db.String(100))
     schema_name = db.Column(db.String(100))
-    db_type = db.Column(db.String(20))
+    db_type = db.Column(db.String(20), db.ForeignKey('dbtypes.db_type_name'))
+    add_time = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     monitor_logs = db.relationship('Monitor_log',backref='dbinfo',lazy='dynamic')
+    follower_users = db.relationship('Follow',
+                                foreign_keys=[Follow.db_id],
+                                backref=db.backref('followed_db', lazy='joined'),
+                                lazy='dynamic',
+                                cascade='all, delete-orphan')
+
+    def is_followed_by(self, user):
+        return self.follower_users.filter_by(
+            follower_id=user.id).first() is not None
+
+    @property
+    def true_ip(self):
+        return db.session.query(db.func.INET_NTOA(Dbinfo.ip)).filter_by(db_id=self.db_id).first()
+
+    @true_ip.setter
+    def true_ip(self,true_ip):
+        self.ip = db.session.query(db.func.INET_ATON(true_ip)).first()[0]
+
+
+class Dbtype(db.Model):
+    __tablename__ = 'dbtypes'
+    db_type_id = db.Column(db.Integer, primary_key=True)
+    db_type_name = db.Column(db.String(20),unique=True,nullable=False)
+    specify_type_dbs = db.relationship('Dbinfo',backref='dbtype',lazy='dynamic')
+
 
 class Monitor_level(db.Model):
     __tablename__ = 'monitor_levels'
