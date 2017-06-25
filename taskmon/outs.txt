@@ -1,0 +1,50 @@
+oracle+cx_oracle://dbmon:dbmon@192.168.0.57:1521/kmjtoa1
+(DatabaseError) ORA-12170: TNS:Connect timeout occurred
+ None None
+KMJTOA connect fault.
+
+
+KMJTOA is checked 
+
+oracle+cx_oracle://dbmon:dbmon@192.168.1.2:1521/oracle1
+(DatabaseError) ORA-12170: TNS:Connect timeout occurred
+ None None
+oracle1 connect fault.
+
+
+oracle1 is checked 
+
+mysql+pymysql://dbmon:dbmon@10.211.55.8:3307/dbtest
+mysql2 connect num is 1.
+
+
+mysql2 is checked 
+
+mysql+pymysql://dbmon:dbmon@192.168.1.5:8200/mongodb1
+(OperationalError) (2003, "Can't connect to MySQL server on '192.168.1.5' (timed out)") None None
+mongodb1 connect fault.
+
+
+mongodb1 is checked 
+
+(OperationalError) (2003, "Can't connect to MySQL server on '192.168.1.1' ([Errno 61] Connection refused)") None None
+mysql1 connect fault.
+
+
+(OperationalError) (2003, "Can't connect to MySQL server on '192.168.1.4' (timed out)") None None
+redis connect fault.
+
+
+(DatabaseError) ORA-12170: TNS:Connect timeout occurred
+ None None
+KMJTOA connect fault.
+
+
+mysql2 connect num is 1.
+
+
+(DatabaseError) ORA-12170: TNS:Connect timeout occurred
+ None None
+oracle1 connect fault.
+
+
