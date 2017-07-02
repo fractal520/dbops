@@ -1,0 +1,39 @@
+<ul class="alarm_logs">
+    {% for alarm_log in alarm_logs %}
+    <li class="alarm_log">
+        <div class="alarm_log-content">
+            <div class="alarm_log-body">
+                {% if alarm_log.alarm_log %}
+                    {{ alarm_log.alarm_log | safe }}
+                {% else %}
+                    {{ alarm_log.alarm_log }}
+                {% endif %}
+            </div>
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+
+
+
+
+
+
+
+            <div class="alarm_log-footer">
+                {% if current_user == alarm_log.author %}
+                <a href="{{ url_for('.edit', id=alarm_log.id) }}">
+                    <span class="label label-primary">Edit</span>
+                </a>
+                {% elif current_user.is_administrator() %}
+                <a href="{{ url_for('.edit', id=alarm_log.id) }}">
+                    <span class="label label-danger">Edit [Admin]</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('.alarm_log', id=alarm_log.id) }}">
+                    <span class="label label-default">Permalink</span>
+                </a>
+                <a href="{{ url_for('.alarm_log', id=alarm_log.id) }}#comments">
+                    <span class="label label-primary">{{ alarm_log.comments.count() }} Comments</span>
+                </a>
+            </div>

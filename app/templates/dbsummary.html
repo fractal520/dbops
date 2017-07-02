@@ -8,7 +8,7 @@
     <div class="profile-header">
         <h1>{{ dbinfos[0].dbname }}</h1>
         <!--{% if dbinfos[0].about_me %}<p>{{ dbinfos[0].about_me }}</p>{% endif %}-->
-        <p>{{ dbinfos[0].monitor_logs.count() }} monitor logs. </p>
+        <p>{{ dbinfos[0].alarm_logs.count() }} monitor logs. </p>
         <p>
             {% if current_user.can(Permission.FOLLOW) and user != current_user %}
                 {% if not current_user.is_following(dbinfo) %}
@@ -23,7 +23,7 @@
 <h3>{{ dbinfos[0].dbname }}的数据库信息</h3>
 {% include '_dbinfo.html' %}
 <h3> {{ dbinfos[0].dbname }}的监控报警 </h3>
-{% include '_monitor_logs.html' %}
+{% include '_alarm_logs.html' %}
 {% if pagination %}
 <div class="pagination">
     {{ macros.pagination_widget(pagination, '.dbsummary', dbname=dbinfos[0].dbname) }}

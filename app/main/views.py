@@ -6,7 +6,7 @@ from . import main
 from .forms import EditProfileForm, EditProfileAdminForm, PostForm,\
     CommentForm, EditDbinfoForm
 from .. import db
-from ..models import Permission, Role, User, Post, Comment, Monitor_log, Dbinfo,Dbtype
+from ..models import Permission, Role, User, Post, Comment, Alarm_level, Alarm_log, Dbinfo, Dbtype
 from ..decorators import admin_required, permission_required
 
 
@@ -46,14 +46,14 @@ def index():
     if current_user.is_authenticated:
         show_followed = bool(request.cookies.get('show_followed', ''))
     if show_followed:
-        query = current_user.followed_monitor_logs
+        query = current_user.followed_alarm_logs
     else:
-        query = Monitor_log.query
-    pagination = query.order_by(Monitor_log.create_time.desc()).paginate(
+        query = Alarm_log.query
+    pagination = query.order_by(Alarm_log.create_time.desc()).paginate(
         page, per_page=current_app.config['FLASKY_POSTS_PER_PAGE'],
         error_out=False)
-    monitor_logs = pagination.items
-    return render_template('index.html', form=form, monitor_logs=monitor_logs,
+    alarm_logs = pagination.items
+    return render_template('index.html', form=form, alarm_logs=alarm_logs,
                            show_followed=show_followed, pagination=pagination)
 
 @main.route('/monitor', methods=['GET', 'POST'])
@@ -70,14 +70,14 @@ def monitor():
     if current_user.is_authenticated:
         show_followed = bool(request.cookies.get('show_followed', ''))
     if show_followed:
-        query = current_user.followed_monitor_logs
+        query = current_user.followed_alarm_logs
     else:
-        query = Monitor_log.query
-    pagination = query.order_by(Monitor_log.create_time.desc()).paginate(
+        query = Alarm_log.query
+    pagination = query.order_by(Alarm_log.create_time.desc()).paginate(
         page, per_page=current_app.config['FLASKY_POSTS_PER_PAGE'],
         error_out=False)
-    monitor_logs = pagination.items
-    return render_template('index.html', form=form, monitor_logs=monitor_logs,
+    alarm_logs = pagination.items
+    return render_template('index.html', form=form, alarm_logs=alarm_logs,
                            show_followed=show_followed, pagination=pagination)
 
 @main.route('/user/<username>')
@@ -101,8 +101,8 @@ def dbinfo(instance_name):
     dbinfo = Dbinfo.query.filter_by(instacne_name=instance_name).first_or_404()
     return render_template('dbinfo.html', dbinfos=[dbinfo])
 
-@main.route('/edit_monitor/<id>')
-def edit_monitor(instance_name):
+@main.route('/edit_alarm/<id>')
+def edit_alarm(instance_name):
     dbinfo = Dbinfo.query.filter_by(instance_name=instance_name).first_or_404()
     return render_template('dbinfo.html', dbinfo=dbinfo)
 
@@ -110,11 +110,11 @@ def edit_monitor(instance_name):
 def dbsummary(dbname):
     dbinfo = Dbinfo.query.filter_by(dbname=dbname).first_or_404()
     page = request.args.get('page', 1, type=int)
-    pagination = dbinfo.monitor_logs.order_by(Monitor_log.create_time.desc()).paginate(
+    pagination = dbinfo.alarm_logs.order_by(Alarm_log.create_time.desc()).paginate(
         page, per_page=current_app.config['FLASKY_POSTS_PER_PAGE'],
         error_out=False)
-    monitor_logs = pagination.items
-    return render_template('dbsummary.html',dbinfos=[dbinfo],monitor_logs=monitor_logs,pagination=pagination)
+    alarm_logs = pagination.items
+    return render_template('dbsummary.html',dbinfos=[dbinfo],alarm_logs=alarm_logs,pagination=pagination)
 
 @main.route('/edit-profile', methods=['GET', 'POST'])
 @login_required

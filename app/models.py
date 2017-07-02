@@ -10,6 +10,7 @@ from app.exceptions import ValidationError
 from sqlalchemy.dialects.mysql.base import INTEGER
 from . import db, login_manager
 
+
 class Permission:
     '''
     FOLLOW = 0x01
@@ -84,16 +85,16 @@ class User(UserMixin, db.Model):
     member_since = db.Column(db.DateTime(), default=datetime.utcnow)
     last_seen = db.Column(db.DateTime(), default=datetime.utcnow)
     avatar_hash = db.Column(db.String(32))
-    #posts = db.relationship('Post', backref='author', lazy='dynamic')
+    # posts = db.relationship('Post', backref='author', lazy='dynamic')
     followed_db = db.relationship('Follow',
-                               foreign_keys=[Follow.follower_id],
-                               backref=db.backref('follower_user', lazy='joined'),
-                               lazy='dynamic',
-                               cascade='all, delete-orphan')
+                                  foreign_keys=[Follow.follower_id],
+                                  backref=db.backref('follower_user', lazy='joined'),
+                                  lazy='dynamic',
+                                  cascade='all, delete-orphan')
     '''
 
     '''
-    #comments = db.relationship('Comment', backref='author', lazy='dynamic')
+    # comments = db.relationship('Comment', backref='author', lazy='dynamic')
 
     @staticmethod
     def generate_fake(count=100):
@@ -135,7 +136,7 @@ class User(UserMixin, db.Model):
         if self.email is not None and self.avatar_hash is None:
             self.avatar_hash = hashlib.md5(
                 self.email.encode('utf-8')).hexdigest()
-        #self.followed.append(Follow(followed=self))
+        # self.followed.append(Follow(followed=self))
 
     @property
     def password(self):
@@ -241,8 +242,8 @@ class User(UserMixin, db.Model):
 
     '''
     @property
-    def followed_monitor_logs(self):
-        return Monitor_log.query.join(Follow, Follow.db_id == Monitor_log.db_id).filter(Follow.follower_id == self.id)
+    def followed_alarm_logs(self):
+        return Alarm_log.query.join(Follow, Follow.db_id == Alarm_log.db_id).filter(Follow.follower_id == self.id)
 
     def to_json(self):
         json_user = {
@@ -281,6 +282,7 @@ class AnonymousUser(AnonymousUserMixin):
 
     def is_administrator(self):
         return False
+
 
 login_manager.anonymous_user = AnonymousUser
 
@@ -393,18 +395,20 @@ class Dbinfo(db.Model):
     __tablename__ = 'dbinfos'
     db_id = db.Column(db.Integer, primary_key=True)
     dbname = db.Column(db.String(100))
-    ip = db.Column(INTEGER(display_width=11,unsigned = True))
+    ip = db.Column(INTEGER(display_width=11, unsigned=True))
     port = db.Column(db.Integer)
     instance_name = db.Column(db.String(100))
     schema_name = db.Column(db.String(100))
     db_type = db.Column(db.String(20), db.ForeignKey('dbtypes.db_type_name'))
     add_time = db.Column(db.DateTime, index=True, default=datetime.utcnow)
-    monitor_logs = db.relationship('Monitor_log',backref='dbinfo',lazy='dynamic')
-    follower_users = db.relationship('Follow',
-                                foreign_keys=[Follow.db_id],
-                                backref=db.backref('followed_db', lazy='joined'),
-                                lazy='dynamic',
-                                cascade='all, delete-orphan')
+    follower_users = db.relationship(
+        'Follow',
+        foreign_keys=[Follow.db_id],
+        backref=db.backref('followed_db', lazy='joined'),
+        lazy='dynamic',
+        cascade='all, delete-orphan')
+    alarm_logs = db.relationship('Alarm_log', backref='dbinfo', lazy='dynamic')
+    alarm_thresholds = db.relationship('Alarm_threshold', backref='dbinfo', lazy='dynamic')
 
     def is_followed_by(self, user):
         return self.follower_users.filter_by(
@@ -415,32 +419,72 @@ class Dbinfo(db.Model):
         return db.session.query(db.func.INET_NTOA(Dbinfo.ip)).filter_by(db_id=self.db_id).first()
 
     @true_ip.setter
-    def true_ip(self,true_ip):
+    def true_ip(self, true_ip):
         self.ip = db.session.query(db.func.INET_ATON(true_ip)).first()[0]
 
 
 class Dbtype(db.Model):
     __tablename__ = 'dbtypes'
     db_type_id = db.Column(db.Integer, primary_key=True)
-    db_type_name = db.Column(db.String(20),unique=True,nullable=False)
-    specify_type_dbs = db.relationship('Dbinfo',backref='dbtype',lazy='dynamic')
+    db_type_name = db.Column(db.String(20), unique=True, nullable=False)
+    specify_type_dbs = db.relationship('Dbinfo', backref='dbtype', lazy='dynamic')
 
 
-class Monitor_level(db.Model):
-    __tablename__ = 'monitor_levels'
+class Alarm_level(db.Model):
+    __tablename__ = 'alarm_levels'
     level_id = db.Column(db.Integer, primary_key=True)
     level_name = db.Column(db.String(20))
     level_desc = db.Column(db.Text)
+    alarm_logs = db.relationship('Alarm_log', backref='alarm_level', lazy='dynamic')
+    alarm_thresholds = db.relationship('Alarm_threshold', backref='alarm_level', lazy='dynamic')
 
-class Monitor_log(db.Model):
-    __tablename__ = 'monitor_logs'
+
+class Alarm_log(db.Model):
+    __tablename__ = 'alarm_logs'
     id = db.Column(db.Integer, primary_key=True)
     db_id = db.Column(db.Integer, db.ForeignKey('dbinfos.db_id'))
-    monitor_log = db.Column(db.Text)
-    monitor_level_name = db.Column(db.String(20))
-    level_id = db.Column(db.Integer, db.ForeignKey('monitor_levels.level_id'))
+    alarm_message = db.Column(db.Text)
+    level_name = db.Column(db.String(20))
+    level_id = db.Column(db.Integer, db.ForeignKey('alarm_levels.level_id'))
+    check_id = db.Column(db.Integer, db.ForeignKey('check_items.check_id'))
     create_time = db.Column(db.DateTime, index=True, default=datetime.utcnow)
-    status = db.Column(db.SmallInteger)
+    status = db.Column(db.SmallInteger, default=2)
     finish_time = db.Column(db.DateTime)
 
 
+class Check_connectivity_log(db.Model):
+    __tablename__ = 'check_connectivity_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    db_id = db.Column(db.Integer, db.ForeignKey('dbinfos.db_id'))
+    status = db.Column(db.String(20))
+    check_time = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+
+
+class Check_connect_num_log(db.Model):
+    __tablename__ = 'check_connect_num_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    db_id = db.Column(db.Integer, db.ForeignKey('dbinfos.db_id'))
+    connect_num = db.Column(db.Integer)
+    max_num = db.Column(db.Integer)
+    check_time = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+
+
+class Check_item(db.Model):
+    __tablename__ = 'check_items'
+    check_id = db.Column(db.Integer, primary_key=True)
+    check_name = db.Column(db.String(100))
+    frequency = db.Column(db.SmallInteger)
+    active = db.Column(db.Boolean, default=True)
+    description = db.Column(db.Text)
+    alarm_logs = db.relationship('Alarm_log', backref='check_item', lazy='dynamic')
+    alarm_thresholds = db.relationship('Alarm_threshold', backref='check_item', lazy='dynamic')
+
+
+class Alarm_threshold(db.Model):
+    __tablename__ = 'alarm_thresholds'
+    id = db.Column(db.Integer, primary_key=True)
+    db_id = db.Column(db.Integer, db.ForeignKey('dbinfos.db_id'))
+    check_id = db.Column(db.Integer, db.ForeignKey('check_items.check_id'))
+    level_id = db.Column(db.Integer, db.ForeignKey('alarm_levels.level_id'))
+    threshold = db.Column(db.Numeric(3, 2))
+    active = db.Column(db.Boolean, default=True)
