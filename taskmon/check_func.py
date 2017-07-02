@@ -46,7 +46,12 @@ async def check_mysql_connect_num(self):
         print(self.get_url)
         # await asyncio.sleep(3)
         conn = await self.get_conn
-        result = await conn.execute('select count(*) from information_schema.processlist union select @@global.max_connections')
+        sql = '''
+              select count(*) from information_schema.processlist
+               union
+              select @@global.max_connections
+              '''
+        result = await conn.execute(sql)
         nums = await result.fetchall()
         connect_num = nums[0][0]
         max_num = nums[1][0]
@@ -70,7 +75,12 @@ async def check_oracle_connect_num(self):
         print(self.get_url)
         # await asyncio.sleep(3)
         conn = await self.get_conn
-        sql = "select count(*) from v$process union select to_number(display_value) from v$parameter where name = 'processes'"
+        sql = '''
+                 select count(*) from v$process
+                  union
+                 select to_number(display_value) from v$parameter
+                  where name = 'processes'
+              '''
         result = await conn.execute(sql)
         nums = await result.fetchall()
         connect_num = nums[0][0]
