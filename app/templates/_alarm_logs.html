@@ -7,6 +7,7 @@
             <div class="post-date">{{ moment(alarm_log.create_time).fromNow() }}</div>
             <div class="post-body">
                 {% if alarm_log.alarm_message %}
+                    <span class="post-label post-lable-warning">{{ alarm_log.level_name}}</span>
                     {{ alarm_log.dbinfo.true_ip[0] }}:{{ alarm_log.dbinfo.port }}/{{ alarm_log.dbinfo.dbname }}
                     {{ alarm_log.alarm_message | safe }}
                 {% else %}

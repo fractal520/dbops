@@ -19,7 +19,7 @@ class Dbinfo(Base):
     port = sa.Column(sa.Integer)
     instance_name = sa.Column(sa.String(100))
     schema_name = sa.Column(sa.String(100))
-    db_type = sa.Column(sa.String(20), sa.ForeignKey('dbtypes.db_type_name'))
+    db_type_id = sa.Column(sa.Integer, sa.ForeignKey('dbtypes.db_type_id'))
     add_time = sa.Column(sa.DateTime, index=True, default=datetime.utcnow)
     alarm_logs = relationship('Alarm_log', backref='dbinfo', lazy='dynamic')
     alarm_thresholds = relationship('Alarm_threshold', backref='dbinfo', lazy='dynamic')

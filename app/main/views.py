@@ -1,13 +1,15 @@
 from flask import render_template, redirect, url_for, abort, flash, request,\
-    current_app, make_response
+    current_app, make_response, jsonify
 from flask_login import login_required, current_user
 from flask_sqlalchemy import get_debug_queries
 from . import main
 from .forms import EditProfileForm, EditProfileAdminForm, PostForm,\
     CommentForm, EditDbinfoForm
 from .. import db
-from ..models import Permission, Role, User, Post, Comment, Alarm_level, Alarm_log, Dbinfo, Dbtype
+from ..models import Permission, Role, User, Post, Comment, Alarm_log, Dbinfo, Dbtype, Check_connect_num_log
 from ..decorators import admin_required, permission_required
+import json
+import time
 
 
 @main.after_app_request
@@ -160,24 +162,24 @@ def edit_profile_admin(id):
     return render_template('edit_profile.html', form=form, user=user)
 
 
-@main.route('/add-db',methods=['GET', 'POST'])
+@main.route('/add-db', methods=['GET', 'POST'])
 @login_required
 def add_dbinfo():
     dbinfo = Dbinfo()
     form = EditDbinfoForm(dbinfo)
     if form.validate_on_submit():
-        dbinfo = Dbinfo(dbname = form.dbname.data,
-                        true_ip = form.true_ip.data,
-                        port = form.port.data,
-                        instance_name = form.instance_name.data,
-                        schema_name = form.schema_name.data,
-                        dbtype = Dbtype.query.get(form.db_type.data)
+        dbinfo = Dbinfo(dbname=form.dbname.data,
+                        true_ip=form.true_ip.data,
+                        port=form.port.data,
+                        instance_name=form.instance_name.data,
+                        schema_name=form.schema_name.data,
+                        dbtype=Dbtype.query.get(form.db_type.data)
                         )
         db.session.add(dbinfo)
         db.session.commit
         flash('A new db  has been added.')
         return redirect(url_for('.dbsinfo'))
-    return render_template('edit_dbinfo.html',form=form,dbinfo=dbinfo)
+    return render_template('edit_dbinfo.html', form=form, dbinfo=dbinfo)
 
 
 @main.route('/edit-dbinfo/<int:db_id>', methods=['GET', 'POST'])
@@ -200,8 +202,20 @@ def edit_dbinfo(db_id):
     form.port.data = dbinfo.port
     form.instance_name.data = dbinfo.instance_name
     form.schema_name.data = dbinfo.schema_name
-    form.db_type.data = dbinfo.dbtype.db_type_id
+    form.db_type.data = dbinfo.db_type_id
     return render_template('edit_dbinfo.html', form=form, dbinfo=dbinfo)
+
+
+@main.route('/chart/<int:db_id>')
+def chart(db_id):
+    '''
+    connect_nums = Check_connect_num_log.query.filter_by(db_id=db_id).all()
+    data = jsonify({'connect_nums': [connect_num.to_json() for connect_num in connect_nums]})
+    '''
+    num = db.session.execute('select check_time,connect_num from check_connect_num_logs where db_id=6')
+    ones = [[time.mktime(i[0].timetuple()), i[1]] for i in num.fetchall()]
+    print (ones)
+    return render_template('chart.html', data=json.dumps(ones))
 
 
 @main.route('/post/<int:id>', methods=['GET', 'POST'])

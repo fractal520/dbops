@@ -399,7 +399,7 @@ class Dbinfo(db.Model):
     port = db.Column(db.Integer)
     instance_name = db.Column(db.String(100))
     schema_name = db.Column(db.String(100))
-    db_type = db.Column(db.String(20), db.ForeignKey('dbtypes.db_type_name'))
+    db_type_id = db.Column(db.Integer, db.ForeignKey('dbtypes.db_type_id'))
     add_time = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     follower_users = db.relationship(
         'Follow',
@@ -468,6 +468,12 @@ class Check_connect_num_log(db.Model):
     max_num = db.Column(db.Integer)
     check_time = db.Column(db.DateTime, index=True, default=datetime.utcnow)
 
+    def to_json(self):
+        json_connect_num = {
+            'connect_num': self.connect_num,
+            'check_time': self.check_time,
+        }
+        return json_connect_num
 
 class Check_item(db.Model):
     __tablename__ = 'check_items'
