@@ -50,7 +50,7 @@ async def check_connectivity(self):
         if status == 'failure':
             ratio = 1
             level_id = decide_alarm(self.db_id, check_id, ratio)
-            await proc_alarm(self.db_id, self.dbname, check_id, level_id)
+            proc_alarm(self.db_id, self.dbname, check_id, level_id)
         return {'db_id': self.db_id, 'status': status, 'check_time': datetime.utcnow()}
 
     finally:

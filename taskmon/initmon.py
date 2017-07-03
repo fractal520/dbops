@@ -11,8 +11,8 @@ Session = sessionmaker(bind=conn)
 session = Session()
 
 
-#dbs = session.query(Dbinfo)
-dbs = session.query(Dbinfo).filter_by(dbname='mysql2')
+dbs = session.query(Dbinfo)
+# dbs = session.query(Dbinfo).filter_by(dbname='mysql2')
 db_types = session.query(Dbtype).all()
 alarm_levels = session.query(Alarm_level).order_by(Alarm_level.level_id).all()
 check_items = session.query(Check_item).all()

@@ -35,7 +35,7 @@ def decide_alarm(db_id, check_id, ratio):
     return alarm_level
 
 
-async def proc_alarm(db_id, dbname, check_id, level_id, alarm_value=1, max_value=1):
+def proc_alarm(db_id, dbname, check_id, level_id, alarm_value=1, max_value=1):
     print('#######livel_id#######' + str(level_id))
     level_name = alarm_level_dict[level_id]
     msg = Template(alarm_msg_dict[check_id])

@@ -8,7 +8,7 @@ from dbmodels import Check_connectivity_log, Check_connect_num_log
 from operator import is_not
 from functools import partial
 from datetime import datetime
-import pdb
+# import pdb
 
 Base = declarative_base()
 conn = sa.create_engine('mysql+pymysql://opr:Opr*1234@127.0.0.1/dbops')
@@ -49,24 +49,18 @@ def task_result(results):
     check_connect_num_list = results[1]
     check_connect_num_list = filter(partial(is_not, None), check_connect_num_list)
 
-    print('check:')
-    print(list(check_connectivity_list))
-    print(list(check_connect_num_list))
-    pdb.set_trace()
-    session.bulk_insert_mappings(Check_connectivity_log, list(check_connectivity_list))
-    pdb.set_trace()
-    session.bulk_insert_mappings(Check_connect_num_log, list(check_connect_num_list))
+    #pdb.set_trace()
+    session.bulk_insert_mappings(Check_connectivity_log, check_connectivity_list)
+    session.bulk_insert_mappings(Check_connect_num_log, check_connect_num_list)
 
     '''
     session.bulk_save_objects([Check_connectivity_log(**kw) for kw in check_connectivity_list if kw is not None])
 
     session.bulk_save_objects([Check_connect_num_log(**kw) for kw in check_connect_num_list if kw is not None])
     '''
-    aa=session.execute('select * from Check_connect_num_logs where to_days(check_time) = to_days(now())')
-    for a in aa:
-        print(a)
+
     session.commit()
-    print('session inserted')
+    print('insert logs complate')
 
 
 def run_task():
