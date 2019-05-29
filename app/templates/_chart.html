@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Dbops chart{% endblock %}
+
+{% block head %}
+{{ super() }}
+    <script type="text/javascript" src="http://cdn.hcharts.cn/highstock/highstock.js"></script>
+    <script type="text/javascript" src="http://cdn.hcharts.cn/jquery/jquery-1.8.3.min.js"></script>
+    <script type="text/javascript" src="http://cdn.hcharts.cn/highcharts/modules/exporting.js"></script>
+{% endblock %}
+
+{% block page_content %}
+    <div id="container" ></div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+    <script type="text/javascript">
+
+    var dbname = "{{dbname}}";
+    var check_name = "{{check_name}}";
+    var title = "the database {{check_name}} history";
+    var data = {{data}};
+    var max_num = {{max_num}};
+    var d = new Date();
+    var tz_mdf = d.getTimezoneOffset();
+    //创建图表
+    var chart;
+    $(document).ready(function() {
+        Highcharts.setOptions({
+            global:{
+                timezoneOffset: 2*tz_mdf
+            }
+        })
+
+
+        chart = new Highcharts.StockChart({
+
+            chart : {
+            renderTo : 'container',
+            events : {
+                load : st// 定时器
+                }
+            },
+
+            rangeSelector: {
+                allButtonsEnabled: true,
+                inputEnabled: $('#container').width() > 480,
+                buttons: [{
+                    type:'day',
+                    count:1,
+                    text:'1d'
+                },{
+                    type:'hour',
+                    count:3,
+                    text:'3h'
+                },{
+                    type:'hour',
+                    count:1,
+                    text:'1h'
+                },{
+                    type:'minute',
+                    count:30,
+                    text:'0.5h'
+                },{
+                    type:'minute',
+                    count:10,
+                    text:'10m'
+                },{
+                    type:'minute',
+                    count:1,
+                    text:'1m'
+                },{
+                    type:'all',
+                    text:'all'
+                }],
+                inputBoxWidth: 80,
+                inputDateFormat: '%m-%d %H:%M',
+                inputEditDateFormat:'%m-%d %H:%M',
+                selected: 2
+            },
+
+            tooltip: {
+                dateTimeLabelFormats: {
+                    millisecond: '%H:%M:%S.%L',
+                    second: '%H:%M:%S',
+                    minute: '%H:%M',
+                    hour: '%H:%M',
+                    day: '%m-%d',
+                    week: '%m-%d',
+                    month: '%Y-%m',
+                    year: '%Y'
+                }
+            },
+
+            exporting:{
+                enabled:true
+            },
+
+            title : {
+                text : title
+            },
+
+            subtitle:{
+                text: dbname
+            },
+
+            xAxis: {
+                type: 'datetime',
+                dateTimeLabelFormats: {
+                    millisecond: '%H:%M:%S.%L',
+                    second: '%H:%M:%S',
+                    minute: '%H:%M',
+                    hour: '%H:%M',
+                    day: '%m-%d',
+                    week: '%m-%d',
+                    month: '%Y-%m',
+                    year: '%Y'
+                },
+                title:{
+                    text:null
+                }
+            },
+
+            yAxis: {
+                crosshair:{},
+                max: max_num,
+                title: {
+                    text: null
+                },
+                plotLines: [{
+                    value: max_num*0.9,
+                    color:'red',
+                    width: 2,
+                    dashStyle: 'shortdash',
+                    label: {
+                        text: 'the 90%'
+                    }
+                },{
+                    value: max_num*0.8,
+                    color:'orange',
+                    width: 2,
+                    dashStyle: 'shortdash',
+                    label: {
+                        text: 'the 80%'
+                    }
+                }]
+            },
+
+            series : [{
+                name: check_name,
+                data : data,
+                type: 'spline',
+                dataGrouping: {
+                    dateTimeLabelFormats: {
+                        millisecond: ['%Y-%m-%d %H:%M:%S.%L', '%Y-%m-%d %H:%M:%S.%L', '~%H:%M:%S.%L'],
+                        second: ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S', '~%H:%M:%S'],
+                        minute: ['%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M', '~%H:%M'],
+                        hour: ['%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M', '~%H:%M'],
+                        day: ['%Y-%m-%d', '%Y-%m-%d', '~%m-%d'],
+                        week: ['%Y-%m-%d', '%Y-%m-%d', '~%m-%d'],
+                        month: ['%Y-%m', '%Y-%m', '~%Y-%m'],
+                        year: ['%Y', '%Y', '~%Y']
+                    }
+                }
+            }]
+
+        });
+
+
+    });
+
+
+    //2秒钟刷新一次数据
+    function st() {
+        setInterval("getData()", 1000*60);
+    }
+
+
+    //动态更新图表数据
+    function getData() {
+    $.ajax({
+        type: "get",
+        url: "/new",
+        dataType: "json",
+        success : function(data){
+            chart.series[0].addPoint(data,true,true);
+        }
+    });
+    }
+
+
+    </script>
+{% endblock %}

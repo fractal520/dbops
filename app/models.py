@@ -68,8 +68,9 @@ class Follow(db.Model):
     follower_id = db.Column(db.Integer, db.ForeignKey('users.id'),
                             primary_key=True)
     db_id = db.Column(db.Integer, db.ForeignKey('dbinfos.db_id'),
-                            primary_key=True)
+                      primary_key=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -391,16 +392,73 @@ class Comment(db.Model):
 db.event.listen(Comment.body, 'set', Comment.on_changed_body)
 
 
+class Ip_address(db.Model):
+    __tablename__ = 'ip_addresses'
+    ip_id = db.Column(db.Integer, primary_key=True)
+    ip_address= db.Column(INTEGER(display_width=11, unsigned=True))
+    instances = db.relationship('Instance', backref='ip_address', lazy='dynamic')
+    hosts = db.relationship('Host', backref='ip_address', lazy='dynamic')
+
+    @property
+    def true_ip(self):
+        return db.session.query(db.func.INET_NTOA(Ip_address.ip_address)).filter_by(ip_id=self.ip_id).first()[0]
+
+    @true_ip.setter
+    def true_ip(self, true_ip):
+        self.ip_address = db.session.query(db.func.INET_ATON(true_ip)).first()[0]
+
+
+class Host(db.Model):
+    __tablename__ = 'hosts'
+    host_id = db.Column(db.Integer, primary_key=True)
+    host_name = db.Column(db.String(100))
+    host_ip_id = db.Column(db.Integer, db.ForeignKey('ip_addresses.ip_id'))
+    instances = db.relationship('Instance', backref='host', lazy='dynamic')
+
+
+class Dbinst_role(db.Model):
+    __tablename__ = 'dbinst_roles'
+    dbinst_role_id = db.Column(db.SmallInteger, primary_key=True)
+    db_type_id = db.Column(db.Integer, db.ForeignKey('dbtypes.db_type_id'))
+    dbinst_role_name = db.Column(db.String(100))
+    specify_role_instes = db.relationship('Instance', backref='dbinst_role', lazy='dynamic')
+
+
+class Instance(db.Model):
+    __tablename__ = 'instances'
+    instance_id = db.Column(db.Integer, primary_key=True)
+    instance_name = db.Column(db.String(100))
+    access_ip_id = db.Column(db.Integer, db.ForeignKey('ip_addresses.ip_id'))
+    access_port = db.Column(db.Integer)
+    dbinst_role_id = db.Column(db.SmallInteger, db.ForeignKey('dbinst_roles.dbinst_role_id'))
+    db_id = db.Column(db.Integer, db.ForeignKey('dbinfos.db_id'))
+    host_id = db.Column(db.Integer, db.ForeignKey('hosts.host_id'))
+
+
+class Dbtype(db.Model):
+    __tablename__ = 'dbtypes'
+    db_type_id = db.Column(db.Integer, primary_key=True)
+    db_type_name = db.Column(db.String(20), unique=True, nullable=False)
+    specify_type_dbs = db.relationship('Dbinfo', backref='dbtype', lazy='dynamic')
+    specify_type_arches = db.relationship('Db_arch', backref='dbtype', lazy='dynamic')
+
+
+class Db_arch(db.Model):
+    __tablename__ = 'db_arches'
+    db_arch_id = db.Column(db.SmallInteger, primary_key=True)
+    db_type_id = db.Column(db.Integer, db.ForeignKey('dbtypes.db_type_id'))
+    db_arch_name = db.Column(db.String(100))
+    specify_arch_dbs = db.relationship('Dbinfo', backref='db_arch', lazy='dynamic')
+
+
 class Dbinfo(db.Model):
     __tablename__ = 'dbinfos'
     db_id = db.Column(db.Integer, primary_key=True)
     dbname = db.Column(db.String(100))
-    ip = db.Column(INTEGER(display_width=11, unsigned=True))
-    port = db.Column(db.Integer)
-    instance_name = db.Column(db.String(100))
-    schema_name = db.Column(db.String(100))
     db_type_id = db.Column(db.Integer, db.ForeignKey('dbtypes.db_type_id'))
+    db_arch_id = db.Column(db.SmallInteger, db.ForeignKey('db_arches.db_arch_id'))
     add_time = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    instances = db.relationship('Instance', backref='dbinfo', lazy='dynamic')
     follower_users = db.relationship(
         'Follow',
         foreign_keys=[Follow.db_id],
@@ -409,25 +467,18 @@ class Dbinfo(db.Model):
         cascade='all, delete-orphan')
     alarm_logs = db.relationship('Alarm_log', backref='dbinfo', lazy='dynamic')
     alarm_thresholds = db.relationship('Alarm_threshold', backref='dbinfo', lazy='dynamic')
+    schemas = db.relationship('Db_schema', backref='dbinfo', lazy='dynamic')
 
     def is_followed_by(self, user):
         return self.follower_users.filter_by(
             follower_id=user.id).first() is not None
 
-    @property
-    def true_ip(self):
-        return db.session.query(db.func.INET_NTOA(Dbinfo.ip)).filter_by(db_id=self.db_id).first()
 
-    @true_ip.setter
-    def true_ip(self, true_ip):
-        self.ip = db.session.query(db.func.INET_ATON(true_ip)).first()[0]
-
-
-class Dbtype(db.Model):
-    __tablename__ = 'dbtypes'
-    db_type_id = db.Column(db.Integer, primary_key=True)
-    db_type_name = db.Column(db.String(20), unique=True, nullable=False)
-    specify_type_dbs = db.relationship('Dbinfo', backref='dbtype', lazy='dynamic')
+class Db_schema(db.Model):
+    __tablename__ = 'db_schemas'
+    schema_id = db.Column(db.Integer, primary_key=True)
+    schema_name = db.Column(db.String(100))
+    db_id = db.Column(db.Integer, db.ForeignKey('dbinfos.db_id'))
 
 
 class Alarm_level(db.Model):
@@ -468,12 +519,11 @@ class Check_connect_num_log(db.Model):
     max_num = db.Column(db.Integer)
     check_time = db.Column(db.DateTime, index=True, default=datetime.utcnow)
 
-    def to_json(self):
-        json_connect_num = {
-            'connect_num': self.connect_num,
-            'check_time': self.check_time,
-        }
-        return json_connect_num
+    @classmethod
+    def get_history(cls, db_id, min_time):
+        check_history = db.session.query(cls.check_time, cls.connect_num, cls.max_num).filter(cls.db_id == db_id, cls.check_time >= min_time).all()
+        return check_history
+
 
 class Check_item(db.Model):
     __tablename__ = 'check_items'
@@ -482,6 +532,7 @@ class Check_item(db.Model):
     frequency = db.Column(db.SmallInteger)
     active = db.Column(db.Boolean, default=True)
     description = db.Column(db.Text)
+    class_of_log = db.Column(db.String(50))
     alarm_logs = db.relationship('Alarm_log', backref='check_item', lazy='dynamic')
     alarm_thresholds = db.relationship('Alarm_threshold', backref='check_item', lazy='dynamic')
 

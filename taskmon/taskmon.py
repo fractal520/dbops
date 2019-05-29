@@ -7,8 +7,9 @@ from get_db import db_check_dict
 from dbmodels import Check_connectivity_log, Check_connect_num_log
 from operator import is_not
 from functools import partial
-from datetime import datetime
-# import pdb
+import time
+from multiprocessing import Process
+import pdb
 
 Base = declarative_base()
 conn = sa.create_engine('mysql+pymysql://opr:Opr*1234@127.0.0.1/dbops')
@@ -35,7 +36,13 @@ def check_task():
 
     check_connect_num = asyncio.gather(*[asyncio.ensure_future(db_check.check_connect_num()) for db_check in db_check_dict.values()])
 
-    check_task = asyncio.gather(check_connectivity, check_connect_num)
+    print('aaa')
+    check_fra_usage = asyncio.gather(*[asyncio.ensure_future(db_check.check_fra_usage()) for db_check in db_check_dict.values()])
+    print('bbb')
+
+    check_task = asyncio.gather(check_connectivity, check_connect_num, check_fra_usage)
+    #check_task = asyncio.gather(check_connectivity)
+    print('check task: %s' % check_task)
     return check_task
 
 
@@ -50,8 +57,11 @@ def task_result(results):
     check_connect_num_list = filter(partial(is_not, None), check_connect_num_list)
 
     #pdb.set_trace()
+
+
     session.bulk_insert_mappings(Check_connectivity_log, check_connectivity_list)
     session.bulk_insert_mappings(Check_connect_num_log, check_connect_num_list)
+
 
     '''
     session.bulk_save_objects([Check_connectivity_log(**kw) for kw in check_connectivity_list if kw is not None])
@@ -71,6 +81,14 @@ def run_task():
         loop.close
 
 
-if __name__ == '__main__':
-    # while True:
+def job_run():
+    while True:
         run_task()
+        time.sleep(5)
+        break
+
+
+if __name__ == '__main__':
+    p = Process(target=job_run)
+    p.start()
+    p.join()

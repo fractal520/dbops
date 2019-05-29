@@ -12,7 +12,7 @@ session = Session()
 
 
 dbs = session.query(Dbinfo)
-# dbs = session.query(Dbinfo).filter_by(dbname='mysql2')
+# dbs = session.query(Dbinfo).filter_by(dbname='KMJTOA')
 db_types = session.query(Dbtype).all()
 alarm_levels = session.query(Alarm_level).order_by(Alarm_level.level_id).all()
 check_items = session.query(Check_item).all()
@@ -40,6 +40,11 @@ for check_item in check_items:
         alarm_msg_dict[check_item.check_id] = alarm_message['connect_num']
         check_func_dict[check_item.check_id] = 'check_connect_num'
         check_func_dict['check_connect_num'] = check_item.check_id
+
+    elif check_item.check_name == 'fra usage':
+        alarm_msg_dict[check_item.check_id] = alarm_message['fra usage']
+        check_func_dict[check_item.check_id] = 'check_fra_usage'
+        check_func_dict['check_fra_usage'] = check_item.check_id
 
     else:
         pass
@@ -69,6 +74,15 @@ for check_item in check_items:
                 check_insn_dict[(check_item.check_id, db_type.db_type_id)] = check_instruction[('connect_num', 'oracle')]
             else:
                 pass
+
+        elif check_item.check_name == 'fra usage':
+            if db_type.db_type_name == 'oracle':
+                check_insn_dict[(check_item.check_id, db_type.db_type_id)] = check_instruction[('fra usage', 'oracle')]
+            else:
+                pass
+
+        else:
+            pass
 
 
 for lev in alarm_levels:

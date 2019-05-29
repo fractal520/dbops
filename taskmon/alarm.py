@@ -27,8 +27,9 @@ def decide_alarm(db_id, check_id, ratio):
             if lev < len(alarm_level_dict):
                 continue
             elif lev == len(alarm_level_dict):
-                alarm_thrd = (True, 0.01)
+                alarm_thrd = (True, 0.8)
         print ('aaa:' + str(alarm_thrd))
+        print('ratio is {}'.format(ratio))
         if (alarm_thrd[0] and (ratio >= alarm_thrd[1])):
             alarm_level = lev
             break
@@ -40,7 +41,7 @@ def proc_alarm(db_id, dbname, check_id, level_id, alarm_value=1, max_value=1):
     level_name = alarm_level_dict[level_id]
     msg = Template(alarm_msg_dict[check_id])
     ratio = round(alarm_value / max_value, 2)
-    message = msg.safe_substitute(dbname=dbname, connect_num=alarm_value, max_num=max_value, percent=ratio)
+    message = msg.safe_substitute(dbname=dbname, alarm_num=alarm_value, max_num=max_value, percent=ratio)
     print(message)
     alarm_log = Alarm_log(db_id=db_id,
                           check_id=check_id,

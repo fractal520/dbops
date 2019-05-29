@@ -1,0 +1,27 @@
+<div>
+   <table class="table table-striped table-hover">
+   <thead>
+      <tr>
+         <th>DB_NAME</th>
+         <th>SHCEMA_NAME</th>
+      </tr>
+   </thead>
+   <tbody>
+   {% for dbinfo in dbinfos %}
+      {% if dbinfo.schemas.all() %}
+      {% for sha in dbinfo.schemas %}
+      <tr>
+         <td><a href="{{ url_for('.add_schema', db_id=dbinfo.db_id) }}">{{ dbinfo.dbname }}</a></td>
+         <td><a href="{{ url_for('.edit_schema', schema_id=sha.schema_id) }}">{{ sha.schema_name}}</a></td>
+      </tr>
+      {% endfor %}
+      {% else %}
+      <tr>
+         <td><a href="{{ url_for('.add_schema', db_id=dbinfo.db_id) }}">{{ dbinfo.dbname }}</a></td>
+         <td></td>
+      </tr>
+      {% endif %}
+   {% endfor %}
+   </tbody>
+   </table>
+</div>

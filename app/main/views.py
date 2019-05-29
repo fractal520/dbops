@@ -1,15 +1,24 @@
 from flask import render_template, redirect, url_for, abort, flash, request,\
-    current_app, make_response, jsonify
+    current_app, make_response
 from flask_login import login_required, current_user
 from flask_sqlalchemy import get_debug_queries
 from . import main
 from .forms import EditProfileForm, EditProfileAdminForm, PostForm,\
-    CommentForm, EditDbinfoForm
+    CommentForm, EditDbinfoForm, EditInstForm, EditHostForm, EditSchemaForm
 from .. import db
-from ..models import Permission, Role, User, Post, Comment, Alarm_log, Dbinfo, Dbtype, Check_connect_num_log
+from .. import models
+from ..models import Permission, Role, User, Post, Comment, Alarm_log, Dbinfo,\
+    Dbtype, Check_item, Dbinst_role, Instance, Db_arch, Ip_address, Host, Db_schema
 from ..decorators import admin_required, permission_required
 import json
 import time
+from datetime import datetime
+
+def nvl(var1, var2):
+    if not var1:
+        return var2
+    else:
+        return var1
 
 
 @main.after_app_request
@@ -58,6 +67,7 @@ def index():
     return render_template('index.html', form=form, alarm_logs=alarm_logs,
                            show_followed=show_followed, pagination=pagination)
 
+
 @main.route('/monitor', methods=['GET', 'POST'])
 def monitor():
     form = PostForm()
@@ -82,6 +92,7 @@ def monitor():
     return render_template('index.html', form=form, alarm_logs=alarm_logs,
                            show_followed=show_followed, pagination=pagination)
 
+
 @main.route('/user/<username>')
 def user(username):
     user = User.query.filter_by(username=username).first_or_404()
@@ -93,22 +104,32 @@ def user(username):
     return render_template('user.html', user=user, posts=posts,
                            pagination=pagination)
 
-@main.route('/dbinfo/')
-def dbsinfo():
+
+@main.route('/databases/')
+def databases():
     dbinfos = Dbinfo.query.order_by(Dbinfo.add_time.desc()).all()
     return render_template('dbinfo.html', dbinfos=dbinfos)
+
+
+@main.route('/instances/')
+def instances():
+    dbinfos = Dbinfo.query.order_by(Dbinfo.add_time.desc()).all()
+    return render_template('instance.html', dbinfos=dbinfos)
+
 
 @main.route('/dbinfo/<instance_name>')
 def dbinfo(instance_name):
     dbinfo = Dbinfo.query.filter_by(instacne_name=instance_name).first_or_404()
     return render_template('dbinfo.html', dbinfos=[dbinfo])
 
+
 @main.route('/edit_alarm/<id>')
 def edit_alarm(instance_name):
     dbinfo = Dbinfo.query.filter_by(instance_name=instance_name).first_or_404()
     return render_template('dbinfo.html', dbinfo=dbinfo)
 
-@main.route('/dbsummary/<dbname>')
+
+@main.route('/db_alarm/<dbname>')
 def dbsummary(dbname):
     dbinfo = Dbinfo.query.filter_by(dbname=dbname).first_or_404()
     page = request.args.get('page', 1, type=int)
@@ -116,7 +137,8 @@ def dbsummary(dbname):
         page, per_page=current_app.config['FLASKY_POSTS_PER_PAGE'],
         error_out=False)
     alarm_logs = pagination.items
-    return render_template('dbsummary.html',dbinfos=[dbinfo],alarm_logs=alarm_logs,pagination=pagination)
+    return render_template('dbsummary.html', dbinfos=[dbinfo], alarm_logs=alarm_logs, pagination=pagination)
+
 
 @main.route('/edit-profile', methods=['GET', 'POST'])
 @login_required
@@ -166,19 +188,20 @@ def edit_profile_admin(id):
 @login_required
 def add_dbinfo():
     dbinfo = Dbinfo()
+    EditDbinfoForm.add_inst.__dict__['kwargs']['default'] = True
     form = EditDbinfoForm(dbinfo)
     if form.validate_on_submit():
         dbinfo = Dbinfo(dbname=form.dbname.data,
-                        true_ip=form.true_ip.data,
-                        port=form.port.data,
-                        instance_name=form.instance_name.data,
-                        schema_name=form.schema_name.data,
-                        dbtype=Dbtype.query.get(form.db_type.data)
+                        dbtype=Dbtype.query.get(form.db_type.data),
+                        db_arch=Db_arch.query.get(form.db_arch.data)
                         )
         db.session.add(dbinfo)
         db.session.commit
         flash('A new db  has been added.')
-        return redirect(url_for('.dbsinfo'))
+        if form.add_inst.data:
+            db_id = Dbinfo.query.filter_by(dbname=form.dbname.data).first().db_id
+            return redirect(url_for('.add_inst', db_id=db_id))
+        return redirect(url_for('.databases'))
     return render_template('edit_dbinfo.html', form=form, dbinfo=dbinfo)
 
 
@@ -186,36 +209,196 @@ def add_dbinfo():
 @login_required
 def edit_dbinfo(db_id):
     dbinfo = Dbinfo.query.get_or_404(db_id)
+    EditDbinfoForm.add_inst.__dict__['kwargs']['default'] = False
     form = EditDbinfoForm(dbinfo=dbinfo)
     if form.validate_on_submit():
         dbinfo.dbname = form.dbname.data
-        dbinfo.true_ip = form.true_ip.data
-        dbinfo.port = form.port.data
-        dbinfo.instance_name = form.instance_name.data
-        dbinfo.schema_name = form.schema_name.data
         dbinfo.dbtype = Dbtype.query.get(form.db_type.data)
+        dbinfo.db_arch = Db_arch.query.get(form.db_arch.data)
         db.session.add(dbinfo)
         flash('The dbinfo has been updated.')
-        return redirect(url_for('.dbsinfo'))
+        if form.add_inst.data:
+            return redirect(url_for('.add_inst', db_id=db_id))
+        return redirect(url_for('.databases'))
     form.dbname.data = dbinfo.dbname
-    form.true_ip.data = dbinfo.true_ip[0]
-    form.port.data = dbinfo.port
-    form.instance_name.data = dbinfo.instance_name
-    form.schema_name.data = dbinfo.schema_name
     form.db_type.data = dbinfo.db_type_id
+    form.db_arch.data = dbinfo.db_arch_id
     return render_template('edit_dbinfo.html', form=form, dbinfo=dbinfo)
 
 
-@main.route('/chart/<int:db_id>')
-def chart(db_id):
-    '''
-    connect_nums = Check_connect_num_log.query.filter_by(db_id=db_id).all()
-    data = jsonify({'connect_nums': [connect_num.to_json() for connect_num in connect_nums]})
-    '''
-    num = db.session.execute('select check_time,connect_num from check_connect_num_logs where db_id=6')
-    ones = [[time.mktime(i[0].timetuple()), i[1]] for i in num.fetchall()]
-    print (ones)
-    return render_template('chart.html', data=json.dumps(ones))
+@main.route('/add-inst', methods=['GET', 'POST'])
+@login_required
+def add_inst():
+    db_id = request.args.get('db_id', type=int)
+    inst = Instance()
+    form = EditInstForm(inst)
+    if form.validate_on_submit():
+        host_ip_addr = nvl(
+            Ip_address.query.filter_by(ip_address=db.session.query(
+                db.func.INET_ATON(form.host_ip.data)).first()[0]).first(),
+            Ip_address(true_ip=form.host_ip.data))
+        host = nvl(
+            Host.query.filter_by(host_name=form.host_name.data).first(),
+            Host(host_name=form.host_name.data))
+        host.ip_address = host_ip_addr
+        if form.inst_ip.data:
+            inst_ip_addr = nvl(
+                Ip_address.query.filter_by(ip_address=db.session.query(
+                    db.func.INET_ATON(form.inst_ip.data)).first()[0]).first(),
+                Ip_address(true_ip=form.inst_ip.data))
+        else:
+            inst_ip_addr = host_ip_addr
+        inst = Instance(instance_name=form.instance_name.data,
+                        dbinst_role=Dbinst_role.query.get(
+                            form.dbinst_role.data),
+                        ip_address=inst_ip_addr,
+                        access_port=form.access_port.data,
+                        db_id=db_id,
+                        host=host
+                        )
+        db.session.add(host_ip_addr)
+        db.session.add(host)
+        db.session.add(inst_ip_addr)
+        db.session.add(inst)
+        db.session.commit
+        flash('A new instance  has been added.')
+        if form.cont_add.data:
+            return redirect(url_for('.add_inst', db_id=db_id))
+        return redirect(url_for('.instances'))
+    return render_template('edit_instance.html', form=form, inst=inst)
+
+
+@main.route('/edit-dbinst/<int:inst_id>', methods=['GET', 'POST'])
+@login_required
+def edit_dbinst(inst_id):
+    inst = Instance.query.get_or_404(inst_id)
+    form = EditInstForm(inst=inst)
+    if form.validate_on_submit():
+        host_ip_addr = nvl(
+            Ip_address.query.filter_by(ip_address=db.session.query(
+                db.func.INET_ATON(form.host_ip.data)).first()[0]).first(),
+            Ip_address(true_ip=form.host_ip.data))
+        host = nvl(
+            Host.query.filter_by(host_name=form.host_name.data).first(),
+            Host(host_name=form.host_name.data))
+        host.ip_address = host_ip_addr
+        inst_ip_addr = nvl(
+            Ip_address.query.filter_by(ip_address=db.session.query(
+                db.func.INET_ATON(form.inst_ip.data)).first()[0]).first(),
+            Ip_address(true_ip=form.inst_ip.data))
+        inst.instance_name = form.instance_name.data
+        inst.dbinst_role = Dbinst_role.query.get(form.dbinst_role.data)
+        inst.access_port = form.access_port.data
+        inst.host = host
+        inst.ip_address = inst_ip_addr
+        db.session.add(host_ip_addr)
+        db.session.add(host)
+        db.session.add(inst_ip_addr)
+        db.session.add(inst)
+        flash('The instance has been updated.')
+        return redirect(url_for('.instances'))
+    form.instance_name.data = inst.instance_name
+    form.dbinst_role.data = inst.dbinst_role_id
+    form.host_name.data = inst.host.host_name
+    form.host_ip.data = inst.host.ip_address.true_ip
+    form.inst_ip.data = inst.ip_address.true_ip
+    form.access_port.data = inst.access_port
+    return render_template('edit_instance.html', form=form, inst=inst)
+
+
+@main.route('/hosts/', methods=['GET', 'POST'])
+@login_required
+def hosts():
+    hosts = Host.query.order_by(Host.host_id.desc()).all()
+    return render_template('host.html', hosts=hosts)
+
+
+@main.route('/edit-host/<int:host_id>', methods=['GET', 'POST'])
+@login_required
+def edit_host(host_id):
+    host = Host.query.get_or_404(host_id)
+    form = EditHostForm()
+    if form.validate_on_submit():
+        host_ip_addr = nvl(
+            Ip_address.query.filter_by(ip_address=db.session.query(
+                db.func.INET_ATON(form.host_ip.data)).first()[0]).first(),
+            Ip_address(true_ip=form.host_ip.data))
+        host.ip_address = host_ip_addr
+        host.host_name = form.host_name.data
+        db.session.add(host_ip_addr)
+        db.session.add(host)
+        flash('The host has been updated.')
+        return redirect(url_for('.hosts'))
+    form.host_name.data = host.host_name
+    form.host_ip.data = host.ip_address.true_ip
+    return render_template('edit_host.html', form=form)
+
+
+@main.route('/schemas/', methods=['GET', 'POST'])
+@login_required
+def schemas():
+    dbinfos = Dbinfo.query.order_by(Dbinfo.add_time.desc()).all()
+    return render_template('schema.html', dbinfos=dbinfos)
+
+
+@main.route('/add-schema/<int:db_id>', methods=['GET', 'POST'])
+@login_required
+def add_schema(db_id):
+    db_schema = Db_schema()
+    form = EditSchemaForm()
+    if form.validate_on_submit():
+        db_schema = Db_schema(schema_name=form.schema_name.data,
+                           db_id=db_id)
+        db.session.add(db_schema)
+        db.session.commit
+        flash('A new db\'s schema has been added.')
+        return redirect(url_for('.schemas'))
+    return render_template('edit_schema.html', form=form, db_schema=db_schema)
+
+
+@main.route('/edit-schema/<int:schema_id>', methods=['GET', 'POST'])
+@login_required
+def edit_schema(schema_id):
+    db_schema = Db_schema.query.get_or_404(schema_id)
+    form = EditSchemaForm()
+    if form.validate_on_submit():
+        db_schema.schema_name = form.schema_name.data
+        db.session.add(db_schema)
+        flash('The db\'s schema has been updated.')
+        return redirect(url_for('.schemas'))
+    form.schema_name.data = db_schema.schema_name
+    return render_template('edit_schema.html', form=form, db_schema=db_schema)
+
+
+@main.route('/chart/<int:check_id>/<int:db_id>')
+def chart(check_id, db_id):
+    return render_template('chart2.html', check_id=check_id, db_id=db_id)
+
+
+@main.route('/chart/getdata')
+def chart_get_data():
+    check_id = request.args.get('check_id', type=int)
+    db_id = request.args.get('db_id', type=int)
+    check_item = Check_item.query.get_or_404(check_id)
+    class_of_log = check_item.class_of_log
+    check_name = check_item.check_name
+    class_name = getattr(models, class_of_log)
+    dbname = Dbinfo.query.get_or_404(db_id).dbname
+    cur_time = datetime.utcnow()
+    min_time = datetime(cur_time.year, cur_time.month, cur_time.day, 0, 0, 0)
+    nums = class_name.get_history(db_id=db_id, min_time=min_time)
+    if nums:
+        max_num = max([num.max_num for num in nums])
+    else:
+        max_num = None
+    dataset = {
+        'check_name': check_name,
+        'dbname': dbname,
+        'max_num': max_num,
+        'data': [[time.mktime(num.check_time.timetuple()) * 1000,
+                  num.connect_num] for num in nums]}
+    json_data = json.dumps({'datasets': [dataset]})
+    return (json_data)
 
 
 @main.route('/post/<int:id>', methods=['GET', 'POST'])
@@ -270,7 +453,7 @@ def follow(dbname):
         flash('You are already following this db.')
         return redirect(url_for('.dbsummary', dbname=dbname))
     current_user.follow(dbinfo)
-    flash('You are now following %s.' % username)
+    flash('You are now following %s.' % dbname)
     return redirect(url_for('.dbsummary', dbname=dbname))
 
 
@@ -328,7 +511,7 @@ def followed_by(username):
 @login_required
 def show_all():
     resp = make_response(redirect(url_for('.index')))
-    resp.set_cookie('show_followed', '', max_age=30*24*60*60)
+    resp.set_cookie('show_followed', '', max_age=30 * 24 * 60 * 60)
     return resp
 
 
@@ -336,7 +519,7 @@ def show_all():
 @login_required
 def show_followed():
     resp = make_response(redirect(url_for('.index')))
-    resp.set_cookie('show_followed', '1', max_age=30*24*60*60)
+    resp.set_cookie('show_followed', '1', max_age=30 * 24 * 60 * 60)
     return resp
 
 

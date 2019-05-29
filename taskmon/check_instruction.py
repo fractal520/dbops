@@ -9,7 +9,10 @@ check_instruction = {
          union
         select to_number(display_value) from v$parameter
          where name = 'processes'
-       ''',
+    ''',
     ('connectivity', 'mysql'): 'select user()',
-    ('connectivity', 'oracle'): 'select 1 from dual'
+    ('connectivity', 'oracle'): 'select 1 from dual',
+    ('fra usage', 'oracle'): '''
+        select sum(PERCENT_SPACE_USED)/100 from v$flash_recovery_area_usage
+        '''
 }

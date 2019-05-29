@@ -7,7 +7,42 @@
 <div class="page-header">
     <h1>{% if dbinfo.db_id == None %}Add {% else %}Edit {% endif %} Db </h1>
 </div>
-<div class="form-horizontal col-md-4">
-    {{ wtf.quick_form(form) }}
-</div>
+</br>
+<fieldset>
+<legend>数据库</legend>
+<form method="post" class="form-horizontal" role="form">
+    <!--{{ wtf.quick_form(form) }} -->
+    {{ form.csrf_token }}
+    <div class="form-group">
+        {{ form.dbname.label(class="col-sm-2 control-label") }}
+        <div class="col-sm-2">
+            {{ form.dbname(class="form-control") }}
+        </div>
+    </div>
+    <div class="form-group">
+        {{ form.db_type.label(class="col-sm-2 control-label") }}
+        <div class="col-sm-1">
+             {{ form.db_type(class="form-control") }}
+        </div>
+        {{ form.db_arch.label(class="col-sm-2 control-label") }}
+        <div class="col-sm-2">
+             {{ form.db_arch(class="form-control") }}
+        </div>
+    </div>
+
+    <div class="form-group">
+        {{ form.add_inst.label(class="col-sm-2 control-label") }}
+        <div class="col-sm-1">
+            {{ form.add_inst(class="form-control") }}
+        </div>
+    </div>
+
+    <div class="form-group">
+        {{ form.submit.label(class="col-sm-2 control-label") }}
+        <div class="col-sm-2">
+            {{ form.submit(class="btn btn-default") }}
+        </div>
+    </div>
+</form>
+</fieldset>
 {% endblock %}

@@ -1,88 +1,210 @@
-<!DOCTYPE HTML>
-<html>
- <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <title>Highcharts Example</title>
-  <script type="text/javascript" src="http://cdn.hcharts.cn/highstock/highstock.js"></script>
-  <script type="text/javascript" src="http://cdn.hcharts.cn/jquery/jquery-1.8.3.min.js"></script>
-  <script type="text/javascript" src="http://cdn.hcharts.cn/highcharts/highcharts.js"></script>
-  <!--<script type="text/javascript" src="http://cdn.hcharts.cn/highcharts/funnel.js"></script>-->
-  <script type="text/javascript" src="http://cdn.hcharts.cn/highcharts/modules/exporting.js"></script>
+{% extends "base.html" %}
 
+{% block title %}Dbops chart{% endblock %}
 
-  <script type="text/javascript">
+{% block head %}
+{{ super() }}
+    <style>
+    .chart {
+    min-width: 320px;
+    max-width: 800px;
+    height: 220px;
+    margin: 0 auto;
+}
 
+    </style>
+    <script src="https://img.hcharts.cn/jquery/jquery-1.8.3.min.js"></script>
+    <script src="https://img.hcharts.cn/highcharts/highcharts.js"></script>
+    <script src="https://img.hcharts.cn/highcharts/highcharts-more.js"></script>
+    <script src="https://img.hcharts.cn/highcharts-plugins/highcharts-zh_CN.js"></script>
+{% endblock %}
 
-  var data={{data}};
+{% block page_content %}
+    <div id="container" ></div>
+{% endblock %}
 
-  //创建图表
-  var chart;
-  $(document).ready(function() {
-   Highcharts.setOptions({
-    global:{
-        useUTC:false
-    }
-   })
-
-
-   chart = new Highcharts.StockChart( {
-    chart : {
-     renderTo : 'container',
-     events : {
-      load : st// 定时器
-     }
-    },
-    rangeSelector: {
-      inputEnabled: $('#container').width() > 480,
-        selected: 1
-    },
-    exporting:{
-     enabled:true
-    },
-    title : {
-     text : '连接数使用情况'
-    },
-    series : [ {
-     name: '连接数使用情况',
-     data : data,
-     type: 'spline',
-     }]
-   });
-
-
-  });
-
-
-
-
-  //2秒钟刷新一次数据
-  function st() {
-   setInterval("getData()", 1000);
-  }
-
-
-  //动态更新图表数据
-  function getData() {
-
-
-   $.ajax({
-      type: "get",
-      url: "/new",
-      dataType: "json",
-      success : function(data){
-      chart.series[0].addPoint(data,true,true);
-
-
-      }
+{% block scripts %}
+{{ super() }}
+    <script type="text/javascript">check_id={{check_id}}; db_id={{db_id}}; </script>
+<script type="text/javascript">
+ $(function () {
+    /**
+     * 为了让多个图表的提示框即十字准星线能够联动，这里绑定多个图表的附件 dom 的鼠标事件进行联动
+     */
+    alert('a2');
+    alert(check_id);
+    alert('b2');
+    alert(db_id);
+    $('#container').bind('mousemove touchmove touchstart', function (e) {
+        var chart,
+            point,
+            i,
+            event;
+        for (i = 0; i < Highcharts.charts.length; i = i + 1) {
+            chart = Highcharts.charts[i];
+            event = chart.pointer.normalize(e.originalEvent); // Find coordinates within the chart
+            point = chart.series[0].searchPoint(event, true); // Get the hovered point
+            if (point) {
+                point.highlight(e);
+            }
+        }
     });
-  }
-
-
-  </script>
- </head>
- <body>
-
-
-<div id="container" ></div>
- </body>
-</html>
+    /**
+     * 重写内部的方法， 这里是将提示框即十字准星的隐藏函数关闭
+     */
+    Highcharts.Pointer.prototype.reset = function () {
+        return undefined;
+    };
+    /**
+     * 高亮当前的数据点，并设置鼠标滑动状态及绘制十字准星线
+     */
+    Highcharts.Point.prototype.highlight = function (event) {
+        this.onMouseOver(); // 显示鼠标激活标识
+        this.series.chart.tooltip.refresh(this); // 显示提示框
+        this.series.chart.xAxis[0].drawCrosshair(event, this); // 显示十字准星线
+    };
+    /**
+     * 同步缩放效果，即当一个图表进行了缩放效果，其他图表也进行缩放
+     */
+    function syncExtremes(e) {
+        var thisChart = this.chart;
+        if (e.trigger !== 'syncExtremes') {
+            Highcharts.each(Highcharts.charts, function (chart) {
+                if (chart !== thisChart) {
+                    if (chart.xAxis[0].setExtremes) {
+                        chart.xAxis[0].setExtremes(e.min, e.max, undefined, false, { trigger: 'syncExtremes' });
+                    }
+                }
+            });
+        }
+    }
+    // 获取 JSON 数据，数据文件地址：
+    //https://github.com/highcharts/highcharts/blob/master/samples/data/activity.json
+    $.getJSON('/chart/getdata', {check_id:check_id, db_id:db_id}, function (activity) {
+        $.each(activity.datasets, function (i, dataset) {
+            $('<div class="chart">')
+                .appendTo('#container')
+                .highcharts({
+                chart: {
+                    renderTo : 'container'
+                },
+                rangeSelector: {
+                    allButtonsEnabled: true,
+                    inputEnabled: $('#container').width() > 480,
+                    buttons: [{
+                        type:'day',
+                        count:1,
+                        text:'1d'
+                    },{
+                        type:'hour',
+                        count:3,
+                        text:'3h'
+                    },{
+                        type:'hour',
+                        count:1,
+                        text:'1h'
+                    },{
+                        type:'minute',
+                        count:30,
+                        text:'0.5h'
+                    },{
+                        type:'minute',
+                        count:10,
+                        text:'10m'
+                    },{
+                        type:'minute',
+                        count:1,
+                        text:'1m'
+                    },{
+                        type:'all',
+                        text:'all'
+                    }],
+                    inputBoxWidth: 80,
+                    inputDateFormat: '%m-%d %H:%M',
+                    inputEditDateFormat:'%m-%d %H:%M',
+                    selected: 2
+                },
+                tooltip: {
+                    dateTimeLabelFormats: {
+                        millisecond: '%H:%M:%S.%L',
+                        second: '%H:%M:%S',
+                        minute: '%H:%M',
+                        hour: '%H:%M',
+                        day: '%m-%d',
+                        week: '%m-%d',
+                        month: '%Y-%m',
+                        year: '%Y'
+                    }
+                },
+                exporting:{
+                    enabled:true
+                },
+                title : {
+                    text : dataset.check_name
+                },
+                subtitle:{
+                    text: dataset.dbname
+                },
+                xAxis: {
+                    type: 'datetime',
+                    dateTimeLabelFormats: {
+                        millisecond: '%H:%M:%S.%L',
+                        second: '%H:%M:%S',
+                        minute: '%H:%M',
+                        hour: '%H:%M',
+                        day: '%m-%d',
+                        week: '%m-%d',
+                        month: '%Y-%m',
+                        year: '%Y'
+                    },
+                    title:{
+                        text:null
+                    }
+                },
+                yAxis: {
+                    crosshair: true,
+                    max: dataset.max_num,
+                    title: {
+                        text: null
+                    },
+                    plotLines: [{
+                        value: dataset.max_num*0.9,
+                        color:'red',
+                        width: 2,
+                        dashStyle: 'shortdash',
+                        label: {
+                            text: 'the 90%'
+                        }
+                    },{
+                        value: dataset.max_num*0.8,
+                        color:'orange',
+                        width: 2,
+                        dashStyle: 'shortdash',
+                        label: {
+                            text: 'the 80%'
+                        }
+                    }]
+                },
+                series: [{
+                    name: dataset.check_name,
+                    data : dataset.data,
+                    type: 'spline',
+                    dataGrouping: {
+                        dateTimeLabelFormats: {
+                            millisecond: ['%Y-%m-%d %H:%M:%S.%L', '%Y-%m-%d %H:%M:%S.%L', '~%H:%M:%S.%L'],
+                            second: ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S', '~%H:%M:%S'],
+                            minute: ['%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M', '~%H:%M'],
+                            hour: ['%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M', '~%H:%M'],
+                            day: ['%Y-%m-%d', '%Y-%m-%d', '~%m-%d'],
+                            week: ['%Y-%m-%d', '%Y-%m-%d', '~%m-%d'],
+                            month: ['%Y-%m', '%Y-%m', '~%Y-%m'],
+                            year: ['%Y', '%Y', '~%Y']
+                        }
+                    }
+                }]
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

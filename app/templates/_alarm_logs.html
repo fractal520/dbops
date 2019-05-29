@@ -8,13 +8,14 @@
             <div class="post-body">
                 {% if alarm_log.alarm_message %}
                     <span class="post-label post-lable-warning">{{ alarm_log.level_name}}</span>
-                    {{ alarm_log.dbinfo.true_ip[0] }}:{{ alarm_log.dbinfo.port }}/{{ alarm_log.dbinfo.dbname }}
+                    {{ alarm_log.dbinfo.instances[0].ip_address.true_ip }}:{{ alarm_log.dbinfo.instances[0].port }}/{{ alarm_log.dbinfo.dbname }}
                     {{ alarm_log.alarm_message | safe }}
                 {% else %}
-                    {{ alarm_log.dbinfo.true_ip[0] }}:{{ alarm_log.dbinfo.port }}/{{ alarm_log.dbinfo.dbname }}
+                    {{ alarm_log.dbinfo.instances[0].ip_address.true_ip }}:{{ alarm_log.dbinfo.instances[0].port }}/{{ alarm_log.dbinfo.dbname }}
                 {% endif %}
             </div>
             <div class="post-footer">
+                <a class="btn btn-info btn-xs" href="{{ url_for('.chart', check_id=alarm_log.check_id, db_id=alarm_log.db_id)}}">View history</a>
                 {% if current_user.is_authenticated and alarm_log.dbinfo.is_followed_by(current_user)  %}
                 <a href="{{ url_for('.edit_alarm', id=alarm_log.id) }}">
                     <span class="label label-primary">Edit</span>

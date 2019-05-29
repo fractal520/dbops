@@ -25,11 +25,11 @@ class Db_check(object):
     @property
     def get_url(self):
         if db_type_dict[self.db_type_id] == 'mysql':
-            url = 'mysql+pymysql://' + self.username + ':' + self.password + '@' + str(self.ip[0]) + ':' + str(self.port) + '/' + self.schema_name
+            url = 'mysql+pymysql://' + self.username + ':' + self.password + '@' + str(self.ip) + ':' + str(self.port) + '/' + self.schema_name
         elif db_type_dict[self.db_type_id] == 'oracle':
-            url = 'oracle+cx_oracle://' + self.username + ':' + self.password + '@' + str(self.ip[0]) + ':' + str(self.port) + '/' + self.instance_name
+            url = 'oracle+cx_oracle://' + self.username + ':' + self.password + '@' + str(self.ip) + ':' + str(self.port) + '/' + self.instance_name
         elif db_type_dict[self.db_type_id] == 'redis':
-            url = 'oracle+cx_oracle://' + self.username + ':' + self.password + '@' + str(self.ip[0]) + ':' + str(self.port) + '/' + self.instance_name
+            url = 'oracle+cx_oracle://' + self.username + ':' + self.password + '@' + str(self.ip) + ':' + str(self.port) + '/' + self.instance_name
         else:
             raise DbTypeError("%s: db tpye %s doesn't support." % (self.dbname,db_type_dict[self.db_type_id]))
         return url
@@ -51,15 +51,16 @@ for db_item in dbs:
     db_check = Db_check(db_id=db_item.db_id,
                         dbname=db_item.dbname,
                         username='dbmon',
-                        password='dbmon',
-                        ip=db_item.true_ip,
-                        port=db_item.port,
-                        instance_name=db_item.instance_name,
-                        schema_name=db_item.schema_name,
+                        password='dbmon1234',
+                        ip=db_item.instances[0].ip_address.true_ip,
+                        port=db_item.instances[0].access_port,
+                        instance_name=db_item.instances[0].instance_name,
+                        schema_name=db_item.schemas[0].schema_name,
                         db_type_id=db_item.db_type_id)
 
     db_check.check_connectivity = MethodType(check_connectivity, db_check)
     db_check.check_connect_num = MethodType(check_connect_num, db_check)
+    db_check.check_fra_usage = MethodType(check_fra_usage, db_check)
 
     db_check_dict[db_check.db_id] = db_check
 
